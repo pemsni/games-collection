@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太空射击</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #fff;
+            margin-top: 20px;
+        }
+        #score {
+            color: white;
+            font-size: 24px;
+            margin-top: 20px;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">分数: <span id="scoreValue">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        <button onclick="game.togglePause()">暂停/继续</button>
+        <button onclick="game.restart()">重新开始</button>
+        <button onclick="game.showHighScores()">排行榜</button>
+        <button onclick="window.location.href='index.html'">返回主页</button>
+    </div>
+
+    <script src="assets/sounds.js"></script>
+    <script src="assets/gameController.js"></script>
+    <script>
+        // 获取难度设置
+        const urlParams = new URLSearchParams(window.location.search);
+        const difficulty = urlParams.get('difficulty') || 'normal';
+
+        // 创建游戏控制器
+        const game = new GameController('space-shooter');
+        game.difficulty = difficulty;
+
+        // 根据难度调整游戏参数
+        const difficultySettings = {
+            easy: {
+                enemySpeed: 2,
+                enemySpawnRate: 0.01,
+                playerSpeed: 6
+            },
+            normal: {
+                enemySpeed: 3,
+                enemySpawnRate: 0.02,
+                playerSpeed: 5
+            },
+            hard: {
+                enemySpeed: 4,
+                enemySpawnRate: 0.03,
+                playerSpeed: 4
+            }
+        };
+
+        const settings = difficultySettings[difficulty];
+
+        // 游戏对象和原有代码保持不变
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('scoreValue');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 50,
+            width: 50,
+            height: 30,
+            speed: settings.playerSpeed
+        };
+
+        let bullets = [];
+        let enemies = [];
+        let score = 0;
+
+        // 修改原有的游戏循环
+        function gameLoop() {
+            if(!game.isPaused) {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // 修改update函数，添加音效
+        function update() {
+            // 移动玩家
+            if(keys.ArrowLeft && player.x > player.width/2) {
+                player.x -= player.speed;
+                SoundManager.play('move');
+            }
+            if(keys.ArrowRight && player.x < canvas.width - player.width/2) {
+                player.x += player.speed;
+                SoundManager.play('move');
+            }
+            if(keys.Space) {
+                if(bullets.length === 0 || bullets[bullets.length-1].y < player.y - 30) {
+                    createBullet();
+                    SoundManager.play('shoot');
+                }
+            }
+
+            // 更新子弹和敌人
+            updateBullets();
+            updateEnemies();
+        }
+
+        // 添加碰撞检测音效
+        function checkCollisions() {
+            bullets.forEach((bullet, bulletIndex) => {
+                enemies.forEach((enemy, enemyIndex) => {
+                    if(bullet.x < enemy.x + enemy.width &&
+                       bullet.x + bullet.width > enemy.x &&
+                       bullet.y < enemy.y + enemy.height &&
+                       bullet.y + bullet.height > enemy.y) {
+                        bullets.splice(bulletIndex, 1);
+                        enemies.splice(enemyIndex, 1);
+                        score += 10;
+                        scoreElement.textContent = score;
+                        SoundManager.play('success');
+                    }
+                });
+            });
+
+            enemies.forEach(enemy => {
+                if(enemy.y + enemy.height > player.y) {
+                    gameOver = true;
+                    SoundManager.play('fail');
+                    alert('游戏结束！');
+                    game.saveScore(score);
+                }
+            });
+        }
+
+        // 添加重启功能
+        game.restart = function() {
+            score = 0;
+            bullets = [];
+            enemies = [];
+            player.x = canvas.width / 2;
+            scoreElement.textContent = '0';
+            gameOver = false;
+            game.isPaused = false;
+            SoundManager.play('bgm');
+            gameLoop();
+        };
+
+        // 初始化游戏
+        SoundManager.play('bgm');
+        gameLoop();
+    </script>
+</body>
+</html> 

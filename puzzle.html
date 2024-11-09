@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字拼图</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            font-family: Arial, sans-serif;
+        }
+        .game-container {
+            margin-top: 40px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            background: #333;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .tile {
+            width: 80px;
+            height: 80px;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .tile:hover {
+            background: #f0f0f0;
+        }
+        .tile.empty {
+            background: #333;
+            cursor: default;
+        }
+        .info {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="info">
+            <span>移动次数: <span id="moves">0</span></span>
+            <span style="margin-left: 20px">用时: <span id="timer">0</span>秒</span>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="controls">
+            <button onclick="restartGame()">重新开始</button>
+            <button onclick="window.location.href='index.html'">返回主页</button>
+        </div>
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        const movesElement = document.getElementById('moves');
+        const timerElement = document.getElementById('timer');
+        let tiles = [];
+        let emptyTile = 15;
+        let moves = 0;
+        let time = 0;
+        let timerInterval;
+        let gameStarted = false;
+
+        function createBoard() {
+            board.innerHTML = '';
+            for(let i = 0; i < 16; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile' + (i === 15 ? ' empty' : '');
+                tile.textContent = i === 15 ? '' : (i + 1).toString();
+                tile.addEventListener('click', () => moveTile(i));
+                board.appendChild(tile);
+                tiles[i] = i;
+            }
+        }
+
+        function shuffleBoard() {
+            // 生成有解的打乱
+            for(let i = 0; i < 1000; i++) {
+                const validMoves = getValidMoves();
+                const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                swapTiles(randomMove, emptyTile);
+                emptyTile = randomMove;
+            }
+            updateBoard();
+        }
+
+        function getValidMoves() {
+            const validMoves = [];
+            const row = Math.floor(emptyTile / 4);
+            const col = emptyTile % 4;
+
+            if(row > 0) validMoves.push(emptyTile - 4); // 上
+            if(row < 3) validMoves.push(emptyTile + 4); // 下
+            if(col > 0) validMoves.push(emptyTile - 1); // 左
+            if(col < 3) validMoves.push(emptyTile + 1); // 右
+
+            return validMoves;
+        }
+
+        function moveTile(index) {
+            if(!gameStarted) {
+                startTimer();
+                gameStarted = true;
+            }
+
+            if(getValidMoves().includes(index)) {
+                swapTiles(index, emptyTile);
+                emptyTile = index;
+                moves++;
+                movesElement.textContent = moves;
+                updateBoard();
+                checkWin();
+            }
+        }
+
+        function swapTiles(index1, index2) {
+            [tiles[index1], tiles[index2]] = [tiles[index2], tiles[index1]];
+        }
+
+        function updateBoard() {
+            const children = board.children;
+            for(let i = 0; i < tiles.length; i++) {
+                children[i].className = 'tile' + (tiles[i] === 15 ? ' empty' : '');
+                children[i].textContent = tiles[i] === 15 ? '' : (tiles[i] + 1).toString();
+            }
+        }
+
+        function checkWin() {
+            if(tiles.every((tile, index) => tile === index)) {
+                clearInterval(timerInterval);
+                alert(`恭喜获胜！\n移动次数：${moves}\n用时：${time}秒`);
+                saveScore();
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                time++;
+                timerElement.textContent = time;
+            }, 1000);
+        }
+
+        function saveScore() {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || {};
+            if(!leaderboard.puzzle) leaderboard.puzzle = [];
+            
+            const playerName = prompt('请输入你的名字：') || 'Anonymous';
+            leaderboard.puzzle.push({
+                name: playerName,
+                moves: moves,
+                time: time,
+                date: new Date().toLocaleDateString()
+            });
+            
+            leaderboard.puzzle.sort((a, b) => a.moves - b.moves);
+            leaderboard.puzzle = leaderboard.puzzle.slice(0, 10);
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+        }
+
+        function restartGame() {
+            clearInterval(timerInterval);
+            moves = 0;
+            time = 0;
+            gameStarted = false;
+            movesElement.textContent = '0';
+            timerElement.textContent = '0';
+            createBoard();
+            shuffleBoard();
+        }
+
+        // 初始化游戏
+        restartGame();
+    </script>
+</body>
+</html> 

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弹球游戏</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #333;
+            margin-top: 20px;
+            background: #fff;
+        }
+        .score {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="score">分数: <span id="scoreValue">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        <button onclick="togglePause()">暂停/继续</button>
+        <button onclick="restartGame()">重新开始</button>
+        <button onclick="window.location.href='index.html'">返回主页</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('scoreValue');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // 游戏对象
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height - 30,
+            radius: 10,
+            speed: 4,
+            dx: 4,
+            dy: -4
+        };
+
+        const paddle = {
+            width: 100,
+            height: 10,
+            x: canvas.width / 2 - 50,
+            speed: 8
+        };
+
+        const brickRowCount = 5;
+        const brickColumnCount = 8;
+        const brickWidth = 80;
+        const brickHeight = 20;
+        const brickPadding = 10;
+        const brickOffsetTop = 30;
+        const brickOffsetLeft = 55;
+
+        let bricks = [];
+        let score = 0;
+        let gameOver = false;
+        let isPaused = false;
+
+        // 初始化砖块
+        function initBricks() {
+            for(let c = 0; c < brickColumnCount; c++) {
+                bricks[c] = [];
+                for(let r = 0; r < brickRowCount; r++) {
+                    bricks[c][r] = { x: 0, y: 0, status: 1 };
+                }
+            }
+        }
+
+        // 绘制球
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#0095DD';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        // 绘制挡板
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.rect(paddle.x, canvas.height - paddle.height, paddle.width, paddle.height);
+            ctx.fillStyle = '#0095DD';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        // 绘制砖块
+        function drawBricks() {
+            for(let c = 0; c < brickColumnCount; c++) {
+                for(let r = 0; r < brickRowCount; r++) {
+                    if(bricks[c][r].status === 1) {
+                        const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+                        const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+                        bricks[c][r].x = brickX;
+                        bricks[c][r].y = brickY;
+                        ctx.beginPath();
+                        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+                        ctx.fillStyle = '#0095DD';
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        // 碰撞检测
+        function collisionDetection() {
+            for(let c = 0; c < brickColumnCount; c++) {
+                for(let r = 0; r < brickRowCount; r++) {
+                    const b = bricks[c][r];
+                    if(b.status === 1) {
+                        if(ball.x > b.x && ball.x < b.x + brickWidth && 
+                           ball.y > b.y && ball.y < b.y + brickHeight) {
+                            ball.dy = -ball.dy;
+                            b.status = 0;
+                            score += 10;
+                            scoreElement.textContent = score;
+                            if(score === brickRowCount * brickColumnCount * 10) {
+                                alert('恭喜获胜！');
+                                saveScore();
+                                gameOver = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 移动球
+        function moveBall() {
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // 墙壁碰撞
+            if(ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                ball.dx = -ball.dx;
+            }
+            if(ball.y - ball.radius < 0) {
+                ball.dy = -ball.dy;
+            }
+
+            // 挡板碰撞
+            if(ball.y + ball.radius > canvas.height - paddle.height) {
+                if(ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+                    ball.dy = -ball.dy;
+                    // 根据击中挡板的位置改变球的方向
+                    const hitPoint = (ball.x - (paddle.x + paddle.width/2)) / (paddle.width/2);
+                    ball.dx = hitPoint * ball.speed;
+                } else if(ball.y + ball.radius > canvas.height) {
+                    gameOver = true;
+                    alert('游戏结束！');
+                    saveScore();
+                }
+            }
+        }
+
+        // 键盘控制
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if(e.key in keys) {
+                keys[e.key] = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if(e.key in keys) {
+                keys[e.key] = false;
+            }
+        });
+
+        function movePaddle() {
+            if(keys.ArrowLeft && paddle.x > 0) {
+                paddle.x -= paddle.speed;
+            }
+            if(keys.ArrowRight && paddle.x + paddle.width < canvas.width) {
+                paddle.x += paddle.speed;
+            }
+        }
+
+        function saveScore() {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || {};
+            if(!leaderboard.breakout) leaderboard.breakout = [];
+            
+            const playerName = prompt('请输入你的名字：') || 'Anonymous';
+            leaderboard.breakout.push({
+                name: playerName,
+                score: score,
+                date: new Date().toLocaleDateString()
+            });
+            
+            leaderboard.breakout.sort((a, b) => b.score - a.score);
+            leaderboard.breakout = leaderboard.breakout.slice(0, 10);
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            if(!isPaused) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function restartGame() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height - 30;
+            ball.dx = 4;
+            ball.dy = -4;
+            paddle.x = canvas.width / 2 - paddle.width / 2;
+            score = 0;
+            scoreElement.textContent = '0';
+            gameOver = false;
+            isPaused = false;
+            initBricks();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBricks();
+            drawBall();
+            drawPaddle();
+        }
+
+        function gameLoop() {
+            if(!gameOver && !isPaused) {
+                moveBall();
+                movePaddle();
+                collisionDetection();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        initBricks();
+        gameLoop();
+    </script>
+</body>
+</html> 

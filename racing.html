@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赛车游戏</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #333;
+            margin-top: 20px;
+            background: #333;
+        }
+        .score {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="score">分数: <span id="scoreValue">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        <button onclick="togglePause()">暂停/继续</button>
+        <button onclick="restartGame()">重新开始</button>
+        <button onclick="window.location.href='index.html'">返回主页</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('scoreValue');
+
+        canvas.width = 400;
+        canvas.height = 600;
+
+        // 游戏对象
+        const player = {
+            x: canvas.width / 2 - 20,
+            y: canvas.height - 100,
+            width: 40,
+            height: 60,
+            speed: 5
+        };
+
+        const obstacles = [];
+        const obstacleWidth = 60;
+        const obstacleHeight = 60;
+        const obstacleSpeed = 3;
+
+        let score = 0;
+        let gameOver = false;
+        let isPaused = false;
+        let animationId;
+
+        // 键盘控制
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if(e.code in keys) {
+                keys[e.code] = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if(e.code in keys) {
+                keys[e.code] = false;
+            }
+        });
+
+        // 创建障碍物
+        function createObstacle() {
+            if(obstacles.length === 0 || 
+               obstacles[obstacles.length - 1].y > 200) {
+                obstacles.push({
+                    x: Math.random() * (canvas.width - obstacleWidth),
+                    y: -obstacleHeight,
+                    width: obstacleWidth,
+                    height: obstacleHeight
+                });
+            }
+        }
+
+        // 移动玩家
+        function movePlayer() {
+            if(keys.ArrowLeft && player.x > 0) {
+                player.x -= player.speed;
+            }
+            if(keys.ArrowRight && player.x < canvas.width - player.width) {
+                player.x += player.speed;
+            }
+        }
+
+        // 更新游戏状态
+        function update() {
+            movePlayer();
+
+            // 移动和移除障碍物
+            for(let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].y += obstacleSpeed;
+
+                // 检查碰撞
+                if(player.x < obstacles[i].x + obstacles[i].width &&
+                   player.x + player.width > obstacles[i].x &&
+                   player.y < obstacles[i].y + obstacles[i].height &&
+                   player.y + player.height > obstacles[i].y) {
+                    gameOver = true;
+                    alert('游戏结束！');
+                    saveScore();
+                    return;
+                }
+
+                // 移除超出屏幕的障碍物并增加分数
+                if(obstacles[i].y > canvas.height) {
+                    obstacles.splice(i, 1);
+                    score += 10;
+                    scoreElement.textContent = score;
+                }
+            }
+
+            createObstacle();
+        }
+
+        // 绘制游戏画面
+        function draw() {
+            // 清空画布
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制道路标记
+            ctx.fillStyle = '#fff';
+            for(let i = 0; i < canvas.height; i += 40) {
+                ctx.fillRect(canvas.width/2 - 2, i, 4, 20);
+            }
+
+            // 绘制玩家
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // 绘制障碍物
+            ctx.fillStyle = '#0f0';
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        function saveScore() {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || {};
+            if(!leaderboard.racing) leaderboard.racing = [];
+            
+            const playerName = prompt('请输入你的名字：') || 'Anonymous';
+            leaderboard.racing.push({
+                name: playerName,
+                score: score,
+                date: new Date().toLocaleDateString()
+            });
+            
+            leaderboard.racing.sort((a, b) => b.score - a.score);
+            leaderboard.racing = leaderboard.racing.slice(0, 10);
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            if(!isPaused) {
+                gameLoop();
+            }
+        }
+
+        function restartGame() {
+            obstacles.length = 0;
+            player.x = canvas.width / 2 - 20;
+            score = 0;
+            scoreElement.textContent = '0';
+            gameOver = false;
+            isPaused = false;
+            if(animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if(!gameOver && !isPaused) {
+                update();
+                draw();
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html> 

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #faf8ef;
+            font-family: Arial, sans-serif;
+        }
+        .game-container {
+            margin-top: 40px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            background: #bbada0;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            background: rgba(238, 228, 218, 0.35);
+            border-radius: 3px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 55px;
+            font-weight: bold;
+            color: #776e65;
+        }
+        .score {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #776e65;
+        }
+        .controls {
+            margin-top: 20px;
+            color: #776e65;
+        }
+        /* 数字颜色 */
+        .n2 { background: #eee4da; }
+        .n4 { background: #ede0c8; }
+        .n8 { background: #f2b179; color: #f9f6f2; }
+        .n16 { background: #f59563; color: #f9f6f2; }
+        .n32 { background: #f67c5f; color: #f9f6f2; }
+        .n64 { background: #f65e3b; color: #f9f6f2; }
+        .n128 { background: #edcf72; color: #f9f6f2; font-size: 45px; }
+        .n256 { background: #edcc61; color: #f9f6f2; font-size: 45px; }
+        .n512 { background: #edc850; color: #f9f6f2; font-size: 45px; }
+        .n1024 { background: #edc53f; color: #f9f6f2; font-size: 35px; }
+        .n2048 { background: #edc22e; color: #f9f6f2; font-size: 35px; }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="score">分数: <span id="scoreValue">0</span></div>
+        <div class="grid" id="grid"></div>
+        <div class="controls">使用方向键移动方块</div>
+    </div>
+
+    <script>
+        let grid = Array(4).fill().map(() => Array(4).fill(0));
+        let score = 0;
+        let gameOver = false;
+
+        // 初始化游戏
+        function initGame() {
+            grid = Array(4).fill().map(() => Array(4).fill(0));
+            score = 0;
+            gameOver = false;
+            addNewTile();
+            addNewTile();
+            updateDisplay();
+        }
+
+        // 添加新方块
+        function addNewTile() {
+            let available = [];
+            for(let i = 0; i < 4; i++) {
+                for(let j = 0; j < 4; j++) {
+                    if(grid[i][j] === 0) {
+                        available.push({x: i, y: j});
+                    }
+                }
+            }
+            if(available.length > 0) {
+                let randomCell = available[Math.floor(Math.random() * available.length)];
+                grid[randomCell.x][randomCell.y] = Math.random() < 0.9 ? 2 : 4;
+            }
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            const gridElement = document.getElementById('grid');
+            gridElement.innerHTML = '';
+            for(let i = 0; i < 4; i++) {
+                for(let j = 0; j < 4; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if(grid[i][j] !== 0) {
+                        cell.textContent = grid[i][j];
+                        cell.classList.add('n' + grid[i][j]);
+                    }
+                    gridElement.appendChild(cell);
+                }
+            }
+            document.getElementById('scoreValue').textContent = score;
+        }
+
+        // 移动和合并
+        function move(direction) {
+            let moved = false;
+            let merged = Array(4).fill().map(() => Array(4).fill(false));
+
+            function moveCell(fromX, fromY, toX, toY) {
+                if(grid[fromX][fromY] === 0) return false;
+                if(grid[toX][toY] === 0) {
+                    grid[toX][toY] = grid[fromX][fromY];
+                    grid[fromX][fromY] = 0;
+                    return true;
+                }
+                if(grid[toX][toY] === grid[fromX][fromY] && !merged[toX][toY]) {
+                    grid[toX][toY] *= 2;
+                    grid[fromX][fromY] = 0;
+                    merged[toX][toY] = true;
+                    score += grid[toX][toY];
+                    return true;
+                }
+                return false;
+            }
+
+            switch(direction) {
+                case 'up':
+                    for(let j = 0; j < 4; j++) {
+                        for(let i = 1; i < 4; i++) {
+                            for(let k = i; k > 0; k--) {
+                                if(moveCell(k, j, k-1, j)) moved = true;
+                            }
+                        }
+                    }
+                    break;
+                case 'down':
+                    for(let j = 0; j < 4; j++) {
+                        for(let i = 2; i >= 0; i--) {
+                            for(let k = i; k < 3; k++) {
+                                if(moveCell(k, j, k+1, j)) moved = true;
+                            }
+                        }
+                    }
+                    break;
+                case 'left':
+                    for(let i = 0; i < 4; i++) {
+                        for(let j = 1; j < 4; j++) {
+                            for(let k = j; k > 0; k--) {
+                                if(moveCell(i, k, i, k-1)) moved = true;
+                            }
+                        }
+                    }
+                    break;
+                case 'right':
+                    for(let i = 0; i < 4; i++) {
+                        for(let j = 2; j >= 0; j--) {
+                            for(let k = j; k < 3; k++) {
+                                if(moveCell(i, k, i, k+1)) moved = true;
+                            }
+                        }
+                    }
+                    break;
+            }
+
+            if(moved) {
+                addNewTile();
+                updateDisplay();
+                checkGameOver();
+            }
+        }
+
+        // 检查游戏是否结束
+        function checkGameOver() {
+            for(let i = 0; i < 4; i++) {
+                for(let j = 0; j < 4; j++) {
+                    if(grid[i][j] === 0) return false;
+                    if(i < 3 && grid[i][j] === grid[i+1][j]) return false;
+                    if(j < 3 && grid[i][j] === grid[i][j+1]) return false;
+                }
+            }
+            gameOver = true;
+            alert('游戏结束！最终得分：' + score);
+            return true;
+        }
+
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            if(gameOver) return;
+            switch(e.key) {
+                case 'ArrowUp': move('up'); break;
+                case 'ArrowDown': move('down'); break;
+                case 'ArrowLeft': move('left'); break;
+                case 'ArrowRight': move('right'); break;
+            }
+        });
+
+        // 开始游戏
+        initGame();
+    </script>
+</body>
+</html> 

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫雷</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            font-family: Arial, sans-serif;
+        }
+        .game-container {
+            margin-top: 40px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: grid;
+            gap: 1px;
+            background: #999;
+            padding: 1px;
+            border-radius: 4px;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            background: #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+        .cell:hover {
+            background: #ddd;
+        }
+        .cell.revealed {
+            background: #fff;
+        }
+        .cell.mine {
+            background: #f00;
+        }
+        .cell.flagged {
+            background: #ff0;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <span>剩余地雷: <span id="minesLeft">10</span></span>
+            <span>时间: <span id="timer">0</span></span>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="controls">
+            <button onclick="restartGame()">重新开始</button>
+            <button onclick="window.location.href='index.html'">返回主页</button>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 10;
+        const MINE_COUNT = 10;
+        let grid = [];
+        let revealed = [];
+        let flagged = [];
+        let gameOver = false;
+        let timeElapsed = 0;
+        let timerInterval;
+        let firstClick = true;
+
+        function initGame() {
+            grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+            revealed = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+            flagged = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+            gameOver = false;
+            firstClick = true;
+            timeElapsed = 0;
+            clearInterval(timerInterval);
+            document.getElementById('timer').textContent = '0';
+            document.getElementById('minesLeft').textContent = MINE_COUNT;
+            createGrid();
+        }
+
+        function createGrid() {
+            const gridElement = document.getElementById('grid');
+            gridElement.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 30px)`;
+            gridElement.innerHTML = '';
+
+            for(let i = 0; i < GRID_SIZE; i++) {
+                for(let j = 0; j < GRID_SIZE; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', () => revealCell(i, j));
+                    cell.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        flagCell(i, j);
+                    });
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        function placeMines(firstRow, firstCol) {
+            let minesPlaced = 0;
+            while(minesPlaced < MINE_COUNT) {
+                const row = Math.floor(Math.random() * GRID_SIZE);
+                const col = Math.floor(Math.random() * GRID_SIZE);
+                if(grid[row][col] !== -1 && !(row === firstRow && col === firstCol)) {
+                    grid[row][col] = -1;
+                    minesPlaced++;
+                }
+            }
+
+            // Calculate numbers
+            for(let i = 0; i < GRID_SIZE; i++) {
+                for(let j = 0; j < GRID_SIZE; j++) {
+                    if(grid[i][j] !== -1) {
+                        grid[i][j] = countAdjacentMines(i, j);
+                    }
+                }
+            }
+        }
+
+        function countAdjacentMines(row, col) {
+            let count = 0;
+            for(let i = -1; i <= 1; i++) {
+                for(let j = -1; j <= 1; j++) {
+                    const newRow = row + i;
+                    const newCol = col + j;
+                    if(newRow >= 0 && newRow < GRID_SIZE && 
+                       newCol >= 0 && newCol < GRID_SIZE &&
+                       grid[newRow][newCol] === -1) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        function revealCell(row, col) {
+            if(gameOver || flagged[row][col]) return;
+
+            if(firstClick) {
+                firstClick = false;
+                placeMines(row, col);
+                startTimer();
+            }
+
+            if(grid[row][col] === -1) {
+                gameOver = true;
+                revealAllMines();
+                clearInterval(timerInterval);
+                alert('游戏结束！');
+                return;
+            }
+
+            revealed[row][col] = true;
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            cell.classList.add('revealed');
+            
+            if(grid[row][col] > 0) {
+                cell.textContent = grid[row][col];
+            } else if(grid[row][col] === 0) {
+                // Reveal adjacent cells
+                for(let i = -1; i <= 1; i++) {
+                    for(let j = -1; j <= 1; j++) {
+                        const newRow = row + i;
+                        const newCol = col + j;
+                        if(newRow >= 0 && newRow < GRID_SIZE && 
+                           newCol >= 0 && newCol < GRID_SIZE &&
+                           !revealed[newRow][newCol]) {
+                            revealCell(newRow, newCol);
+                        }
+                    }
+                }
+            }
+
+            checkWin();
+        }
+
+        function flagCell(row, col) {
+            if(gameOver || revealed[row][col]) return;
+
+            flagged[row][col] = !flagged[row][col];
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            cell.classList.toggle('flagged');
+            
+            const minesLeft = MINE_COUNT - document.querySelectorAll('.flagged').length;
+            document.getElementById('minesLeft').textContent = minesLeft;
+        }
+
+        function revealAllMines() {
+            for(let i = 0; i < GRID_SIZE; i++) {
+                for(let j = 0; j < GRID_SIZE; j++) {
+                    if(grid[i][j] === -1) {
+                        const cell = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
+                        cell.classList.add('mine');
+                    }
+                }
+            }
+        }
+
+        function checkWin() {
+            let unrevealedCount = 0;
+            for(let i = 0; i < GRID_SIZE; i++) {
+                for(let j = 0; j < GRID_SIZE; j++) {
+                    if(!revealed[i][j] && grid[i][j] !== -1) {
+                        unrevealedCount++;
+                    }
+                }
+            }
+            if(unrevealedCount === 0) {
+                gameOver = true;
+                clearInterval(timerInterval);
+                alert(`恭喜获胜！用时：${timeElapsed}秒`);
+                saveScore();
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeElapsed++;
+                document.getElementById('timer').textContent = timeElapsed;
+            }, 1000);
+        }
+
+        function saveScore() {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || {};
+            if(!leaderboard.minesweeper) leaderboard.minesweeper = [];
+            
+            const playerName = prompt('请输入你的名字：') || 'Anonymous';
+            leaderboard.minesweeper.push({
+                name: playerName,
+                score: timeElapsed,
+                date: new Date().toLocaleDateString()
+            });
+            
+            leaderboard.minesweeper.sort((a, b) => a.score - b.score);
+            leaderboard.minesweeper = leaderboard.minesweeper.slice(0, 10);
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+        }
+
+        function restartGame() {
+            initGame();
+        }
+
+        initGame();
+    </script>
+</body>
+</html> 

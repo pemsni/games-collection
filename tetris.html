@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俄罗斯方块</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #f3f4f6;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #333;
+            margin-top: 20px;
+            background: #fff;
+        }
+        .score {
+            margin-top: 20px;
+            font-size: 24px;
+        }
+        .controls {
+            margin-top: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="score">分数: <span id="scoreValue">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        方向键：移动方块 | 上键：旋转 | 空格：快速下落
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('scoreValue');
+
+        canvas.width = 300;
+        canvas.height = 600;
+        const blockSize = 30;
+        const cols = canvas.width / blockSize;
+        const rows = canvas.height / blockSize;
+
+        let score = 0;
+        let gameOver = false;
+        let board = Array(rows).fill().map(() => Array(cols).fill(0));
+        let currentPiece;
+        let currentX;
+        let currentY;
+
+        const pieces = [
+            [[1,1,1,1]],
+            [[1,1],[1,1]],
+            [[1,1,1],[0,1,0]],
+            [[1,1,1],[1,0,0]],
+            [[1,1,1],[0,0,1]],
+            [[1,1,0],[0,1,1]],
+            [[0,1,1],[1,1,0]]
+        ];
+
+        function newPiece() {
+            const piece = pieces[Math.floor(Math.random() * pieces.length)];
+            currentPiece = piece;
+            currentX = Math.floor((cols - piece[0].length) / 2);
+            currentY = 0;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制已固定的方块
+            for(let y = 0; y < rows; y++) {
+                for(let x = 0; x < cols; x++) {
+                    if(board[y][x]) {
+                        ctx.fillStyle = '#3498db';
+                        ctx.fillRect(x * blockSize, y * blockSize, 
+                            blockSize-1, blockSize-1);
+                    }
+                }
+            }
+
+            // 绘制当前方块
+            if(currentPiece) {
+                ctx.fillStyle = '#e74c3c';
+                for(let y = 0; y < currentPiece.length; y++) {
+                    for(let x = 0; x < currentPiece[y].length; x++) {
+                        if(currentPiece[y][x]) {
+                            ctx.fillRect((currentX + x) * blockSize, 
+                                (currentY + y) * blockSize, 
+                                blockSize-1, blockSize-1);
+                        }
+                    }
+                }
+            }
+
+            if(gameOver) {
+                ctx.fillStyle = '#000';
+                ctx.font = '48px Arial';
+                ctx.fillText('游戏结束!', 20, canvas.height/2);
+            }
+        }
+
+        function canMove(piece, newX, newY) {
+            for(let y = 0; y < piece.length; y++) {
+                for(let x = 0; x < piece[y].length; x++) {
+                    if(piece[y][x]) {
+                        let nextX = newX + x;
+                        let nextY = newY + y;
+                        if(nextX < 0 || nextX >= cols || 
+                           nextY >= rows || 
+                           (nextY >= 0 && board[nextY][nextX])) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function merge() {
+            for(let y = 0; y < currentPiece.length; y++) {
+                for(let x = 0; x < currentPiece[y].length; x++) {
+                    if(currentPiece[y][x]) {
+                        board[currentY + y][currentX + x] = 1;
+                    }
+                }
+            }
+        }
+
+        function clearLines() {
+            for(let y = rows-1; y >= 0; y--) {
+                if(board[y].every(cell => cell)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(cols).fill(0));
+                    score += 100;
+                    scoreElement.textContent = score;
+                }
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if(gameOver) return;
+
+            switch(e.key) {
+                case 'ArrowLeft':
+                    if(canMove(currentPiece, currentX-1, currentY)) {
+                        currentX--;
+                    }
+                    break;
+                case 'ArrowRight':
+                    if(canMove(currentPiece, currentX+1, currentY)) {
+                        currentX++;
+                    }
+                    break;
+                case 'ArrowDown':
+                    if(canMove(currentPiece, currentX, currentY+1)) {
+                        currentY++;
+                    }
+                    break;
+                case 'ArrowUp':
+                    const rotated = currentPiece[0].map((_, i) => 
+                        currentPiece.map(row => row[i]).reverse()
+                    );
+                    if(canMove(rotated, currentX, currentY)) {
+                        currentPiece = rotated;
+                    }
+                    break;
+                case ' ':
+                    while(canMove(currentPiece, currentX, currentY+1)) {
+                        currentY++;
+                    }
+                    break;
+            }
+            draw();
+        });
+
+        function gameLoop() {
+            if(!gameOver) {
+                if(!currentPiece) {
+                    newPiece();
+                }
+                if(canMove(currentPiece, currentX, currentY+1)) {
+                    currentY++;
+                } else {
+                    merge();
+                    clearLines();
+                    newPiece();
+                    if(!canMove(currentPiece, currentX, currentY)) {
+                        gameOver = true;
+                    }
+                }
+                draw();
+            }
+        }
+
+        newPiece();
+        setInterval(gameLoop, 500);
+        draw();
+    </script>
+</body>
+</html> 

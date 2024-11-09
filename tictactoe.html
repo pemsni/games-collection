@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>井字棋</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            font-family: Arial, sans-serif;
+        }
+        .game-container {
+            margin-top: 40px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 5px;
+            background: #333;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .cell:hover {
+            background: #f0f0f0;
+        }
+        .info {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="info">当前玩家: <span id="currentPlayer">X</span></div>
+        <div class="board" id="board"></div>
+        <div class="controls">
+            <button onclick="restartGame()">重新开始</button>
+            <button onclick="window.location.href='index.html'">返回主页</button>
+        </div>
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        const currentPlayerElement = document.getElementById('currentPlayer');
+        let currentPlayer = 'X';
+        let gameBoard = Array(9).fill('');
+        let gameOver = false;
+
+        // 创建棋盘
+        function createBoard() {
+            board.innerHTML = '';
+            for(let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.index = i;
+                cell.addEventListener('click', () => makeMove(i));
+                board.appendChild(cell);
+            }
+        }
+
+        // 下棋
+        function makeMove(index) {
+            if(gameOver || gameBoard[index]) return;
+
+            gameBoard[index] = currentPlayer;
+            const cell = board.children[index];
+            cell.textContent = currentPlayer;
+
+            if(checkWin()) {
+                gameOver = true;
+                alert(`玩家 ${currentPlayer} 获胜！`);
+                saveScore();
+                return;
+            }
+
+            if(checkDraw()) {
+                gameOver = true;
+                alert('平局！');
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            currentPlayerElement.textContent = currentPlayer;
+        }
+
+        // 检查胜利
+        function checkWin() {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横向
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // 纵向
+                [0, 4, 8], [2, 4, 6]             // 对角线
+            ];
+
+            return winPatterns.some(pattern => {
+                const [a, b, c] = pattern;
+                return gameBoard[a] &&
+                       gameBoard[a] === gameBoard[b] &&
+                       gameBoard[a] === gameBoard[c];
+            });
+        }
+
+        // 检查平局
+        function checkDraw() {
+            return gameBoard.every(cell => cell);
+        }
+
+        function saveScore() {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || {};
+            if(!leaderboard.tictactoe) leaderboard.tictactoe = [];
+            
+            const playerName = prompt('请输入你的名字：') || 'Anonymous';
+            leaderboard.tictactoe.push({
+                name: playerName,
+                winner: currentPlayer,
+                date: new Date().toLocaleDateString()
+            });
+            
+            leaderboard.tictactoe = leaderboard.tictactoe.slice(-10);
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+        }
+
+        function restartGame() {
+            gameBoard = Array(9).fill('');
+            gameOver = false;
+            currentPlayer = 'X';
+            currentPlayerElement.textContent = currentPlayer;
+            Array.from(board.children).forEach(cell => {
+                cell.textContent = '';
+            });
+        }
+
+        // 初始化游戏
+        createBoard();
+    </script>
+</body>
+</html> 

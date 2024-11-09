@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扑克牌记忆游戏</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            font-family: Arial, sans-serif;
+        }
+        .game-container {
+            margin-top: 40px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            max-width: 600px;
+            padding: 20px;
+        }
+        .card {
+            width: 120px;
+            height: 180px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            cursor: pointer;
+        }
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .card-front {
+            background: #2c3e50;
+            color: white;
+        }
+        .card-back {
+            background: white;
+            transform: rotateY(180deg);
+        }
+        .card-back.hearts, .card-back.diamonds {
+            color: red;
+        }
+        .card-back.clubs, .card-back.spades {
+            color: black;
+        }
+        .info {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="info">
+            <span>步数: <span id="moves">0</span></span>
+            <span style="margin-left: 20px">配对: <span id="matches">0</span>/8</span>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="controls">
+            <button onclick="restartGame()">重新开始</button>
+            <button onclick="window.location.href='index.html'">返回主页</button>
+        </div>
+    </div>
+
+    <script>
+        const suits = ['♥', '♦', '♣', '♠'];
+        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let moves = 0;
+        let canFlip = true;
+
+        function createDeck() {
+            const deck = [];
+            suits.forEach(suit => {
+                values.forEach(value => {
+                    deck.push({
+                        suit,
+                        value,
+                        id: suit + value
+                    });
+                });
+            });
+            return deck;
+        }
+
+        function shuffleCards() {
+            // 随机选择8对牌
+            const deck = createDeck();
+            const selectedCards = [];
+            for(let i = 0; i < 8; i++) {
+                const randomIndex = Math.floor(Math.random() * deck.length);
+                const card = deck.splice(randomIndex, 1)[0];
+                selectedCards.push(card, {...card});
+            }
+            
+            // 打乱这16张牌
+            for(let i = selectedCards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [selectedCards[i], selectedCards[j]] = [selectedCards[j], selectedCards[i]];
+            }
+            
+            return selectedCards;
+        }
+
+        function getSuitClass(suit) {
+            switch(suit) {
+                case '♥': return 'hearts';
+                case '♦': return 'diamonds';
+                case '♣': return 'clubs';
+                case '♠': return 'spades';
+            }
+        }
+
+        function createCard(card, index) {
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card';
+            cardElement.innerHTML = `
+                <div class="card-face card-front">🎴</div>
+                <div class="card-face card-back ${getSuitClass(card.suit)}">
+                    ${card.value}${card.suit}
+                </div>
+            `;
+            cardElement.dataset.index = index;
+            cardElement.addEventListener('click', () => flipCard(cardElement, card));
+            return cardElement;
+        }
+
+        function flipCard(cardElement, card) {
+            if(!canFlip || cardElement.classList.contains('flipped') || flippedCards.length >= 2) return;
+
+            cardElement.classList.add('flipped');
+            flippedCards.push({element: cardElement, card: card});
+
+            if(flippedCards.length === 2) {
+                moves++;
+                document.getElementById('moves').textContent = moves;
+                canFlip = false;
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            const [card1, card2] = flippedCards;
+            const match = card1.card.id === card2.card.id;
+
+            setTimeout(() => {
+                if(!match) {
+                    card1.element.classList.remove('flipped');
+                    card2.element.classList.remove('flipped');
+                } else {
+                    matchedPairs++;
+                    document.getElementById('matches').textContent = matchedPairs;
+                    if(matchedPairs === 8) {
+                        alert(`恭喜！你用了 ${moves} 步完成了游戏！`);
+                        saveScore();
+                    }
+                }
+                flippedCards = [];
+                canFlip = true;
+            }, 1000);
+        }
+
+        function saveScore() {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || {};
+            if(!leaderboard.poker) leaderboard.poker = [];
+            
+            const playerName = prompt('请输入你的名字：') || 'Anonymous';
+            leaderboard.poker.push({
+                name: playerName,
+                score: moves,
+                date: new Date().toLocaleDateString()
+            });
+            
+            leaderboard.poker.sort((a, b) => a.score - b.score);
+            leaderboard.poker = leaderboard.poker.slice(0, 10);
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+        }
+
+        function initGame() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            cards = shuffleCards();
+            cards.forEach((card, index) => {
+                board.appendChild(createCard(card, index));
+            });
+            matchedPairs = 0;
+            moves = 0;
+            document.getElementById('moves').textContent = '0';
+            document.getElementById('matches').textContent = '0';
+        }
+
+        function restartGame() {
+            const allCards = document.querySelectorAll('.card');
+            allCards.forEach(card => card.classList.remove('flipped'));
+            setTimeout(initGame, 500);
+        }
+
+        initGame();
+    </script>
+</body>
+</html> 
